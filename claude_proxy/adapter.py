@@ -119,7 +119,7 @@ class AnthropicStreamBuilder:
         self.stop_reason = "end_turn"
         self.tool_calls: dict[int, dict[str, Any]] = {}
         self.usage = {"input_tokens": 0, "output_tokens": 0}
-        self.reasoning_output_chars = 0
+        self.reasoning_tokens = 0
         self.reasoning_prefix_sent = False
 
     def consume(self, chunk: dict[str, Any]) -> list[dict[str, Any]]:
@@ -156,7 +156,7 @@ class AnthropicStreamBuilder:
             delta = choice.get("delta") or {}
             reasoning = _delta_reasoning_to_text(delta)
             if reasoning:
-                self.reasoning_output_chars += len(reasoning)
+                self.reasoning_tokens += 1
                 if self.expose_reasoning:
                     if not self.reasoning_prefix_sent:
                         reasoning = f"Reasoning:\n{reasoning}"

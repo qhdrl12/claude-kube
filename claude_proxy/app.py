@@ -251,7 +251,7 @@ async def _stream_upstream_events(
         },
         started_at,
         stream=True,
-        observed_reasoning_chars=builder.reasoning_output_chars,
+        observed_reasoning_tokens=builder.reasoning_tokens,
     )
 
 
@@ -375,14 +375,15 @@ def _log_usage(
     started_at: float,
     *,
     stream: bool,
-    observed_reasoning_chars: int | None = None,
+    observed_reasoning_tokens: int | None = None,
 ) -> None:
     summary = _usage_summary(usage)
-    if observed_reasoning_chars is not None:
-        summary["reasoning_output_chars"] = observed_reasoning_chars
-        if summary["reasoning_tokens"] is None and observed_reasoning_chars > 0:
-            estimated_tokens = _estimate_tokens_from_chars(observed_reasoning_chars)
-            summary["reasoning_tokens_estimated"] = estimated_tokens
+    if (
+        summary["reasoning_tokens"] is None
+        and observed_reasoning_tokens is not None
+        and observed_reasoning_tokens > 0
+    ):
+        summary["reasoning_tokens"] = observed_reasoning_tokens
     summary.update(
         {
             "request_id": request_id,
@@ -555,7 +556,6 @@ def _usage_summary(usage: Any) -> dict[str, Any]:
         "output_tokens": _first_int(usage.get("completion_tokens"), usage.get("output_tokens")),
         "total_tokens": _first_int(usage.get("total_tokens")),
         "reasoning_tokens": reasoning_tokens,
-        "reasoning_tokens_estimated": None,
         "usage_keys": sorted(usage.keys()),
         "completion_token_detail_keys": sorted(completion_details.keys()),
         "cached_input_tokens": _first_int(
@@ -570,10 +570,6 @@ def _first_dict(*values: Any) -> dict[str, Any]:
         if isinstance(value, dict):
             return value
     return {}
-
-
-def _estimate_tokens_from_chars(char_count: int) -> int:
-    return max(1, (char_count + 3) // 4)
 
 
 def _first_int(*values: Any) -> int | None:

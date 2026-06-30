@@ -485,7 +485,7 @@ async def test_messages_route_requests_stream_usage_from_openai_compatible_upstr
 
 
 @pytest.mark.asyncio
-async def test_messages_route_logs_reasoning_chars_when_upstream_usage_lacks_reasoning_tokens(
+async def test_messages_route_counts_reasoning_deltas_when_upstream_usage_lacks_reasoning_tokens(
     monkeypatch,
     caplog,
 ) -> None:
@@ -543,15 +543,15 @@ async def test_messages_route_logs_reasoning_chars_when_upstream_usage_lacks_rea
     assert '"input_tokens": 5' in logs
     assert '"output_tokens": 7' in logs
     assert '"total_tokens": 12' in logs
-    assert '"reasoning_tokens": null' in logs
-    assert '"reasoning_tokens_estimated": 3' in logs
-    assert '"reasoning_output_chars": 10' in logs
+    assert '"reasoning_tokens": 2' in logs
+    assert "reasoning_tokens_estimated" not in logs
+    assert "reasoning_output_chars" not in logs
     assert '"usage_keys": ["completion_tokens", "prompt_tokens", "total_tokens"]' in logs
     assert "think more" not in logs
 
 
 @pytest.mark.asyncio
-async def test_messages_route_keeps_exact_reasoning_tokens_null_when_only_estimate_exists(
+async def test_messages_route_counts_single_reasoning_delta_as_one_reasoning_token(
     monkeypatch,
     caplog,
 ) -> None:
@@ -608,9 +608,9 @@ async def test_messages_route_keeps_exact_reasoning_tokens_null_when_only_estima
 
     assert response.status_code == 200
     logs = "\n".join(record.getMessage() for record in caplog.records)
-    assert '"reasoning_output_chars": 12' in logs
-    assert '"reasoning_tokens": null' in logs
-    assert '"reasoning_tokens_estimated": 3' in logs
+    assert '"reasoning_tokens": 1' in logs
+    assert "reasoning_tokens_estimated" not in logs
+    assert "reasoning_output_chars" not in logs
     assert "abcdefghijkl" not in logs
 
 

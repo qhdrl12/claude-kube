@@ -243,12 +243,14 @@ After enabling the parser, check the gateway logs:
 
 ```text
 claude_proxy.reasoning_config ... "upstream_reasoning_format": "vllm" ... "upstream_reasoning_effort": "high" ... "upstream_include_reasoning": true
-claude_proxy.usage ... "reasoning_output_chars": 7144 ...
+claude_proxy.usage ... "reasoning_tokens": 7144 ...
 ```
 
-`reasoning_output_chars` greater than zero means vLLM emitted reasoning text and the
-gateway observed it. Exact `reasoning_tokens` still depends on whether vLLM includes a
-separate reasoning token count in the usage object.
+`reasoning_tokens` greater than zero means vLLM emitted reasoning through
+`delta.reasoning` or legacy `delta.reasoning_content` and the gateway observed it. If
+vLLM also includes an exact reasoning token count in the usage object, that upstream
+usage value is preserved. Otherwise the gateway counts non-empty reasoning deltas as
+reasoning tokens, matching vLLM setups that stream reasoning one token per delta.
 
 The gateway reads vLLM-separated reasoning fields instead of parsing `<think>...</think>`
 as the primary path. It prefers the current `reasoning` field and falls back to legacy
@@ -341,16 +343,15 @@ claude_proxy.reasoning_config {"claude_effort": "high", "claude_thinking_type": 
 Usage log:
 
 ```text
-claude_proxy.usage {"elapsed_ms": 1240.5, "input_tokens": 1800, "output_tokens": 420, "reasoning_tokens": 96, "reasoning_output_chars": 540, "reasoning_tokens_estimated": null, "stream": true, "total_tokens": 2220}
+claude_proxy.usage {"elapsed_ms": 1240.5, "input_tokens": 1800, "output_tokens": 420, "reasoning_tokens": 96, "stream": true, "total_tokens": 2220}
 ```
 
 Use these two lines to compare `--effort low`, `--effort high`, and `--effort xhigh`.
-Some upstreams do not report `reasoning_tokens`; in that case the field is logged as
-`null`. If the upstream streams reasoning text without a separate reasoning token count,
-the gateway logs `reasoning_output_chars` and `reasoning_tokens_estimated` as diagnostics
-without changing the exact `reasoning_tokens` field. `reasoning_output_chars` is the
-Python string length of the hidden reasoning chunks emitted by vLLM as `delta.reasoning`
-or legacy `delta.reasoning_content`; it is not token usage.
+When the upstream usage object reports `reasoning_tokens`, that exact value is logged. If
+streaming vLLM omits the usage field but emits reasoning text, the gateway counts each
+non-empty `delta.reasoning` or legacy `delta.reasoning_content` as one
+`reasoning_tokens` unit. If no reasoning deltas are observed and upstream usage does not
+report reasoning tokens, `reasoning_tokens` remains `null`.
 
 For debugging upstream stream shapes, enable sanitized per-chunk logs:
 
