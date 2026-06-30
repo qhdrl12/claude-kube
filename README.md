@@ -136,11 +136,26 @@ Point Claude Code at this gateway:
 
 ```bash
 export ANTHROPIC_BASE_URL=http://127.0.0.1:8000
+export CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY=1
+export ANTHROPIC_MODEL=glm-5.2
 export ANTHROPIC_DEFAULT_OPUS_MODEL=glm-5.2
 export ANTHROPIC_DEFAULT_SONNET_MODEL=glm-5.2
 export ANTHROPIC_DEFAULT_HAIKU_MODEL=glm-5.2
 export CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1
 ```
+
+With `CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY=1`, Claude Code can populate its
+`/model` picker from this gateway's `/v1/models` response. If discovery is not enabled,
+Claude Code may only show its built-in model choices even though `/readyz` and `/v1/models`
+list `glm-5.2`.
+
+Run Claude Code after setting the exports:
+
+```bash
+claude --model glm-5.2
+```
+
+Or start Claude Code without `--model` and pick the gateway alias from `/model`.
 
 `CLAUDE_PROXY_GATEWAY_AUTH_TOKEN` is optional. Leave it unset for local-only use.
 If the gateway is exposed beyond localhost, set `CLAUDE_PROXY_GATEWAY_AUTH_TOKEN` on
@@ -162,9 +177,12 @@ claude-switch() {
   case "$1" in
     kube)
       export ANTHROPIC_BASE_URL=http://127.0.0.1:8000
+      export CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY=1
+      export ANTHROPIC_MODEL=glm-5.2
       export ANTHROPIC_DEFAULT_OPUS_MODEL=glm-5.2
       export ANTHROPIC_DEFAULT_SONNET_MODEL=glm-5.2
       export ANTHROPIC_DEFAULT_HAIKU_MODEL=glm-5.2
+      export CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1
       unset ANTHROPIC_AUTH_TOKEN
       ;;
     kube-list)
