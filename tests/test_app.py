@@ -65,6 +65,7 @@ async def test_models_route_lists_registered_model_aliases() -> None:
                 "object": "model",
                 "owned_by": "claude-proxy",
                 "upstream_model": "glm-5.2-serving",
+                "upstream_path": "/v1/chat/completions",
                 "routing_tier": "default",
                 "capabilities": {
                     "streaming": True,
@@ -78,9 +79,53 @@ async def test_models_route_lists_registered_model_aliases() -> None:
                 "object": "model",
                 "owned_by": "claude-proxy",
                 "upstream_model": "qwen-coder-serving",
+                "upstream_path": "/v1/chat/completions",
                 "routing_tier": "fast",
                 "capabilities": {},
             },
+        ],
+    }
+
+
+@pytest.mark.asyncio
+async def test_readyz_includes_registered_aliases_and_upstream_paths() -> None:
+    app = create_app(
+        settings=Settings(gateway_auth_token=None),
+        registry=ModelRegistry(
+            models=[
+                ModelConfig(
+                    alias="glm-5.2",
+                    upstream_base_url="https://kubeflow.example/serving/model/v1/chat/completions",
+                    upstream_model="glm-5.2",
+                    api_key_env="KUBEFLOW_API_KEY",
+                )
+            ]
+        ),
+        upstream_client=httpx.AsyncClient(
+            transport=httpx.MockTransport(lambda _: httpx.Response(200))
+        ),
+    )
+
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app),
+        base_url="http://test",
+    ) as client:
+        response = await client.get("/readyz")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "status": "ready",
+        "models": ["glm-5.2"],
+        "model_details": [
+            {
+                "id": "glm-5.2",
+                "object": "model",
+                "owned_by": "claude-proxy",
+                "upstream_model": "glm-5.2",
+                "upstream_path": "/serving/model/v1/chat/completions",
+                "routing_tier": "default",
+                "capabilities": {},
+            }
         ],
     }
 

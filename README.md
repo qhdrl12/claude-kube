@@ -121,6 +121,15 @@ List registered gateway model aliases:
 curl -s http://127.0.0.1:8000/v1/models
 ```
 
+Confirm the exact upstream path the gateway will call:
+
+```bash
+curl -s http://127.0.0.1:8000/readyz
+```
+
+`model_details[].upstream_path` should match the Kubeflow OpenAI-compatible route, for
+example `/serving/ai-platform/common-model-glm-5-2-fp8-1-0-0/v1/chat/completions`.
+
 ## Claude Code Wiring
 
 Point Claude Code at this gateway:
@@ -285,3 +294,11 @@ it to the configured fallback alias. `bad_request` means the gateway rejected th
 before calling upstream, usually because no fallback was available. `upstream_error`
 means the upstream endpoint returned the error and the gateway preserved that status for
 Claude Code.
+
+For upstream 404s, check `upstream_path` in the log and `/readyz`. If `.env` was edited
+but the path did not change, restart the gateway and check whether an existing shell
+export is overriding `.env`:
+
+```bash
+env | grep '^KUBEFLOW_'
+```

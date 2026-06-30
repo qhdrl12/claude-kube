@@ -61,7 +61,11 @@ def create_app(
 
     @app.get("/readyz")
     async def readyz() -> dict[str, Any]:
-        return {"status": "ready", "models": [model.alias for model in registry.models]}
+        return {
+            "status": "ready",
+            "models": [model.alias for model in registry.models],
+            "model_details": [_model_detail(model) for model in registry.models],
+        }
 
     @app.get("/v1/models")
     async def list_models() -> dict[str, Any]:
@@ -289,17 +293,19 @@ def _sse(event: str, data: dict[str, Any]) -> str:
 def _model_list_response(registry: ModelRegistry) -> dict[str, Any]:
     return {
         "object": "list",
-        "data": [
-            {
-                "id": model.alias,
-                "object": "model",
-                "owned_by": "claude-proxy",
-                "upstream_model": model.upstream_model,
-                "routing_tier": model.routing_tier,
-                "capabilities": model.capabilities,
-            }
-            for model in registry.models
-        ],
+        "data": [_model_detail(model) for model in registry.models],
+    }
+
+
+def _model_detail(model) -> dict[str, Any]:
+    return {
+        "id": model.alias,
+        "object": "model",
+        "owned_by": "claude-proxy",
+        "upstream_model": model.upstream_model,
+        "upstream_path": _url_path(model.upstream_chat_completions_url),
+        "routing_tier": model.routing_tier,
+        "capabilities": model.capabilities,
     }
 
 
