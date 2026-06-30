@@ -228,6 +228,28 @@ model, such as the appropriate `--reasoning-parser` or model-specific chat templ
 thinking configuration. If vLLM is not reasoning-enabled, it may accept the request but
 answer immediately without `delta.reasoning`.
 
+For GLM reasoning models, configure the Kubeflow/vLLM serving command with the GLM parser
+used by your vLLM version. For GLM-4.5 style reasoning output this is commonly:
+
+```bash
+vllm serve <glm-model> --reasoning-parser glm45
+```
+
+In Kubeflow, the same flag should be present in the container args for the model server.
+Without this server-side parser, the gateway can still send `reasoning_effort`, but vLLM
+may return only normal `content` and no `delta.reasoning`.
+
+After enabling the parser, check the gateway logs:
+
+```text
+claude_proxy.reasoning_config ... "upstream_reasoning_format": "vllm" ... "upstream_reasoning_effort": "high" ... "upstream_include_reasoning": true
+claude_proxy.usage ... "reasoning_output_chars": 7144 ...
+```
+
+`reasoning_output_chars` greater than zero means vLLM emitted reasoning text and the
+gateway observed it. Exact `reasoning_tokens` still depends on whether vLLM includes a
+separate reasoning token count in the usage object.
+
 If a served model requires extra vLLM request fields, add them per model:
 
 ```yaml
