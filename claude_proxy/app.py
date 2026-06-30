@@ -505,11 +505,7 @@ def _usage_summary(usage: Any) -> dict[str, Any]:
         "output_tokens": _first_int(usage.get("completion_tokens"), usage.get("output_tokens")),
         "total_tokens": _first_int(usage.get("total_tokens")),
         "reasoning_tokens": reasoning_tokens,
-        "reasoning_tokens_source": (
-            "upstream_usage" if reasoning_tokens is not None else "unavailable_upstream"
-        ),
         "reasoning_tokens_estimated": None,
-        "reasoning_tokens_exact": reasoning_tokens is not None,
         "usage_keys": sorted(usage.keys()),
         "completion_token_detail_keys": sorted(completion_details.keys()),
         "cached_input_tokens": _first_int(

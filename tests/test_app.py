@@ -408,7 +408,6 @@ async def test_messages_route_logs_reasoning_chars_when_upstream_usage_lacks_rea
     assert '"total_tokens": 12' in logs
     assert '"reasoning_tokens": null' in logs
     assert '"reasoning_tokens_estimated": 3' in logs
-    assert '"reasoning_tokens_source": "unavailable_upstream"' in logs
     assert '"reasoning_output_chars": 10' in logs
     assert '"usage_keys": ["completion_tokens", "prompt_tokens", "total_tokens"]' in logs
     assert "think more" not in logs
@@ -475,8 +474,6 @@ async def test_messages_route_keeps_exact_reasoning_tokens_null_when_only_estima
     assert '"reasoning_output_chars": 12' in logs
     assert '"reasoning_tokens": null' in logs
     assert '"reasoning_tokens_estimated": 3' in logs
-    assert '"reasoning_tokens_source": "unavailable_upstream"' in logs
-    assert '"reasoning_tokens_exact": false' in logs
     assert "abcdefghijkl" not in logs
 
 

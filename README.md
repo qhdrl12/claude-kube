@@ -341,16 +341,16 @@ claude_proxy.reasoning_config {"claude_effort": "high", "claude_thinking_type": 
 Usage log:
 
 ```text
-claude_proxy.usage {"elapsed_ms": 1240.5, "input_tokens": 1800, "output_tokens": 420, "reasoning_tokens": 96, "reasoning_tokens_source": "upstream_usage", "reasoning_output_chars": 540, "stream": true, "total_tokens": 2220}
+claude_proxy.usage {"elapsed_ms": 1240.5, "input_tokens": 1800, "output_tokens": 420, "reasoning_tokens": 96, "reasoning_output_chars": 540, "reasoning_tokens_estimated": null, "stream": true, "total_tokens": 2220}
 ```
 
 Use these two lines to compare `--effort low`, `--effort high`, and `--effort xhigh`.
 Some upstreams do not report `reasoning_tokens`; in that case the field is logged as
-`null` and `reasoning_tokens_source` is `unavailable_upstream`. If the upstream streams
-reasoning text without a separate reasoning token count, the gateway logs
-`reasoning_output_chars` and `reasoning_tokens_estimated` as diagnostics without changing
-the exact `reasoning_tokens` field. Exact reasoning token counts are only logged with
-`reasoning_tokens_source: "upstream_usage"`.
+`null`. If the upstream streams reasoning text without a separate reasoning token count,
+the gateway logs `reasoning_output_chars` and `reasoning_tokens_estimated` as diagnostics
+without changing the exact `reasoning_tokens` field. `reasoning_output_chars` is the
+Python string length of the hidden reasoning chunks emitted by vLLM as `delta.reasoning`
+or legacy `delta.reasoning_content`; it is not token usage.
 
 400 diagnostics:
 
