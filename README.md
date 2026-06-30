@@ -7,6 +7,23 @@ requests to OpenAI-compatible upstreams such as OpenRouter or Kubeflow/vLLM.
 
 This project is pinned to Python 3.13.
 
+Recommended `uv` setup:
+
+```bash
+uv venv --python 3.13
+uv pip install -e '.[dev]'
+```
+
+If you need to reset the local environment:
+
+```bash
+rm -rf .venv
+uv venv --python 3.13
+uv pip install -e '.[dev]'
+```
+
+Equivalent standard `venv` setup:
+
 ```bash
 /Users/bongkilee/.local/bin/python3.13 -m venv .venv
 .venv/bin/python -m pip install -e '.[dev]'
@@ -55,6 +72,12 @@ fails at startup with the missing variable name.
 ```bash
 export CLAUDE_PROXY_REGISTRY_PATH=config/models.yaml
 
+uv run uvicorn claude_proxy.main:app --host 127.0.0.1 --port 8000
+```
+
+The direct `.venv` command is equivalent:
+
+```bash
 .venv/bin/uvicorn claude_proxy.main:app --host 127.0.0.1 --port 8000
 ```
 
@@ -149,6 +172,12 @@ Additional models are added as more `models[]` entries. Claude Code keeps using 
 ## Verification
 
 Fast local tests:
+
+```bash
+uv run pytest
+```
+
+The direct `.venv` command is equivalent:
 
 ```bash
 .venv/bin/python -m pytest
