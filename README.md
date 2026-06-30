@@ -250,6 +250,12 @@ claude_proxy.usage ... "reasoning_output_chars": 7144 ...
 gateway observed it. Exact `reasoning_tokens` still depends on whether vLLM includes a
 separate reasoning token count in the usage object.
 
+The gateway reads vLLM-separated reasoning fields instead of parsing `<think>...</think>`
+as the primary path. It prefers the current `reasoning` field and falls back to legacy
+`reasoning_content` for older vLLM-compatible responses. If a parser bug leaks
+`<think>...</think>` into visible `content`, the gateway strips that leaked block as a
+defensive fallback.
+
 If a served model requires extra vLLM request fields, add them per model:
 
 ```yaml

@@ -309,6 +309,50 @@ def test_openai_reasoning_only_response_maps_to_visible_text_fallback() -> None:
     assert result["stop_reason"] == "max_tokens"
 
 
+def test_openai_reasoning_content_response_maps_to_visible_text_fallback() -> None:
+    response = {
+        "id": "chatcmpl_reasoning",
+        "choices": [
+            {
+                "message": {
+                    "role": "assistant",
+                    "content": None,
+                    "reasoning_content": "legacy reasoning field",
+                },
+                "finish_reason": "stop",
+            }
+        ],
+    }
+
+    result = openai_chat_to_anthropic_message(response, requested_model="glm-5.2")
+
+    assert result["content"] == [
+        {
+            "type": "text",
+            "text": "Reasoning:\nlegacy reasoning field",
+        }
+    ]
+
+
+def test_openai_response_strips_leaked_think_block_from_visible_content() -> None:
+    response = {
+        "id": "chatcmpl_leaked_think",
+        "choices": [
+            {
+                "message": {
+                    "role": "assistant",
+                    "content": "<think>hidden reasoning</think>\nfinal answer",
+                },
+                "finish_reason": "stop",
+            }
+        ],
+    }
+
+    result = openai_chat_to_anthropic_message(response, requested_model="glm-5.2")
+
+    assert result["content"] == [{"type": "text", "text": "final answer"}]
+
+
 def test_openai_response_prefers_visible_content_over_reasoning_fallback() -> None:
     response = {
         "id": "chatcmpl_content",
@@ -499,6 +543,54 @@ def test_openai_reasoning_stream_delta_can_disable_visible_fallback() -> None:
         "message_delta",
         "message_stop",
     ]
+
+
+def test_openai_reasoning_content_stream_delta_and_content_are_both_processed() -> None:
+    chunks = [
+        {"id": "chatcmpl_reasoning", "choices": [{"delta": {"role": "assistant"}}]},
+        {
+            "choices": [
+                {
+                    "delta": {
+                        "reasoning_content": "hidden",
+                        "content": "visible",
+                    },
+                    "finish_reason": "stop",
+                }
+            ]
+        },
+    ]
+
+    events = list(openai_stream_chunks_to_anthropic_events(chunks, requested_model="glm-5.2"))
+
+    assert [event["event"] for event in events] == [
+        "message_start",
+        "content_block_start",
+        "content_block_delta",
+        "content_block_stop",
+        "content_block_start",
+        "content_block_delta",
+        "content_block_stop",
+        "message_delta",
+        "message_stop",
+    ]
+    assert events[2]["data"]["delta"] == {
+        "type": "text_delta",
+        "text": "Reasoning:\nhidden",
+    }
+    assert events[5]["data"]["delta"] == {"type": "text_delta", "text": "visible"}
+
+
+def test_openai_stream_strips_leaked_think_block_from_visible_content() -> None:
+    chunks = [
+        {"id": "chatcmpl_reasoning", "choices": [{"delta": {"role": "assistant"}}]},
+        {"choices": [{"delta": {"content": "<think>hidden</think>\nvisible"}}]},
+        {"choices": [{"delta": {}, "finish_reason": "stop"}]},
+    ]
+
+    events = list(openai_stream_chunks_to_anthropic_events(chunks, requested_model="glm-5.2"))
+
+    assert events[2]["data"]["delta"] == {"type": "text_delta", "text": "visible"}
 
 
 def test_openai_tool_call_stream_uses_anthropic_input_json_delta_events() -> None:

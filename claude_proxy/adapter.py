@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import json
+import re
 import uuid
 from collections.abc import Iterable, Iterator
 from typing import Any
 
 from claude_proxy.config import ModelConfig
+
+_THINK_BLOCK_PATTERN = re.compile(r"<think>(.*?)</think>", re.DOTALL)
 
 
 def anthropic_messages_to_openai_chat(
@@ -151,9 +154,6 @@ class AnthropicStreamBuilder:
 
         for choice in chunk.get("choices", []):
             delta = choice.get("delta") or {}
-            if text := delta.get("content"):
-                events.extend(self._append_text_delta(text, kind="content"))
-
             reasoning = _delta_reasoning_to_text(delta)
             if reasoning:
                 self.reasoning_output_chars += len(reasoning)
@@ -162,6 +162,9 @@ class AnthropicStreamBuilder:
                         reasoning = f"Reasoning:\n{reasoning}"
                         self.reasoning_prefix_sent = True
                     events.extend(self._append_text_delta(reasoning, kind="reasoning"))
+
+            if text := _strip_leaked_think_block(delta.get("content")):
+                events.extend(self._append_text_delta(text, kind="content"))
 
             for tool_call in delta.get("tool_calls") or []:
                 index = int(tool_call.get("index", 0))
@@ -436,10 +439,11 @@ def _openai_message_content_to_anthropic_blocks(
     blocks: list[dict[str, Any]] = []
     content = message.get("content")
     if isinstance(content, str) and content:
-        blocks.append({"type": "text", "text": content})
+        if text := _strip_leaked_think_block(content):
+            blocks.append({"type": "text", "text": text})
     elif isinstance(content, list):
         text = _block_content_to_text(content)
-        if text:
+        if text := _strip_leaked_think_block(text):
             blocks.append({"type": "text", "text": text})
 
     for tool_call in message.get("tool_calls") or []:
@@ -502,13 +506,23 @@ def _json_loads_object(value: str) -> dict[str, Any]:
 def _message_reasoning_to_text(message: dict[str, Any]) -> str:
     if reasoning := message.get("reasoning"):
         return str(reasoning)
+    if reasoning_content := message.get("reasoning_content"):
+        return str(reasoning_content)
     return _reasoning_details_to_text(message.get("reasoning_details"))
 
 
 def _delta_reasoning_to_text(delta: dict[str, Any]) -> str:
     if reasoning := delta.get("reasoning"):
         return str(reasoning)
+    if reasoning_content := delta.get("reasoning_content"):
+        return str(reasoning_content)
     return _reasoning_details_to_text(delta.get("reasoning_details"))
+
+
+def _strip_leaked_think_block(text: Any) -> str:
+    if not isinstance(text, str) or not text:
+        return ""
+    return _THINK_BLOCK_PATTERN.sub("", text).lstrip()
 
 
 def _reasoning_details_to_text(reasoning_details: Any) -> str:
