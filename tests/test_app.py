@@ -367,6 +367,77 @@ async def test_messages_route_can_log_sanitized_upstream_stream_chunk_shapes(
 
 
 @pytest.mark.asyncio
+async def test_messages_route_can_write_raw_upstream_stream_chunks_to_debug_file(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    monkeypatch.setenv("KUBEFLOW_API_KEY", "upstream-secret")
+    raw_stream_path = tmp_path / "raw-upstream-stream.jsonl"
+    transport = FakeUpstreamTransport(
+        httpx.Response(
+            200,
+            text=(
+                'data: {"id":"chatcmpl_1","choices":[{"index":0,"delta":'
+                '{"reasoning":"hidden","content":"visible"}}],'
+                '"usage":{"prompt_tokens":5,"completion_tokens":7,"total_tokens":12}}\n\n'
+                "data: [DONE]\n\n"
+            ),
+            headers={"content-type": "text/event-stream"},
+        )
+    )
+    app = create_app(
+        settings=Settings(
+            gateway_auth_token=None,
+            raw_upstream_stream_path=str(raw_stream_path),
+        ),
+        registry=ModelRegistry(
+            models=[
+                ModelConfig(
+                    alias="glm-5.2",
+                    upstream_base_url="https://kubeflow.example/v1",
+                    upstream_model="glm-5.2-serving",
+                    api_key_env="KUBEFLOW_API_KEY",
+                )
+            ]
+        ),
+        upstream_client=httpx.AsyncClient(transport=transport),
+    )
+
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app),
+        base_url="http://test",
+    ) as client:
+        response = await client.post(
+            "/v1/messages",
+            json={
+                "model": "glm-5.2",
+                "max_tokens": 128,
+                "stream": True,
+                "messages": [{"role": "user", "content": "hello"}],
+            },
+        )
+
+    assert response.status_code == 200
+    records = [
+        json.loads(line)
+        for line in raw_stream_path.read_text(encoding="utf-8").splitlines()
+    ]
+    assert len(records) == 1
+    assert records[0]["event"] == "upstream_stream_chunk_raw"
+    assert records[0]["model_alias"] == "glm-5.2"
+    assert records[0]["chunk_index"] == 0
+    assert records[0]["chunk"]["choices"][0]["delta"] == {
+        "reasoning": "hidden",
+        "content": "visible",
+    }
+    assert records[0]["chunk"]["usage"] == {
+        "prompt_tokens": 5,
+        "completion_tokens": 7,
+        "total_tokens": 12,
+    }
+
+
+@pytest.mark.asyncio
 async def test_messages_route_requests_stream_usage_from_openai_compatible_upstream(
     monkeypatch,
 ) -> None:

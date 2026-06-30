@@ -364,15 +364,27 @@ reasoning/content character counts, tool call counts, and the upstream `usage` o
 It does not log prompt text, visible content, reasoning text, tool arguments, API keys, or
 authorization headers.
 
-If you need full raw chunks for local-only debugging, use the existing capture file
-instead:
+If you need full raw upstream stream chunks for local-only debugging, write them to a
+dedicated JSONL file:
+
+```bash
+export CLAUDE_PROXY_RAW_UPSTREAM_STREAM_PATH=tmp/upstream-stream-raw.jsonl
+uv run uvicorn claude_proxy.main:app
+```
+
+Each line contains the raw upstream chunk exactly as the gateway received it, plus
+metadata such as `request_id`, `model_alias`, and `chunk_index`. This is the best option
+when you need to inspect whether vLLM sends reasoning token fields under a different key.
+
+The broader capture file records all gateway stages, including requests and converted
+responses:
 
 ```bash
 export CLAUDE_PROXY_CAPTURE_PATH=tmp/claude-proxy-capture.jsonl
 ```
 
-The capture file may contain model output text and tool payloads, so do not share it
-without reviewing/redacting it first.
+Raw stream and capture files may contain model output text, hidden reasoning, and tool
+payloads, so do not share them without reviewing/redacting them first.
 
 400 diagnostics:
 

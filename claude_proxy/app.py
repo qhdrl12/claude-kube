@@ -229,6 +229,7 @@ async def _stream_upstream_events(
             chunk = json.loads(data)
             if settings.log_upstream_stream_chunks:
                 _log_upstream_stream_chunk(request_id, model, chunk_index, chunk)
+            _write_raw_upstream_stream_chunk(settings, request_id, model, chunk_index, chunk)
             chunk_index += 1
             if isinstance(chunk.get("usage"), dict):
                 stream_usage = chunk["usage"]
@@ -614,6 +615,30 @@ def _capture(
         record["query"] = _sanitize_capture(query)
     with path.open("a", encoding="utf-8") as file:
         file.write(json.dumps(record, ensure_ascii=False) + "\n")
+
+
+def _write_raw_upstream_stream_chunk(
+    settings: Settings,
+    request_id: str,
+    model,
+    chunk_index: int,
+    chunk: dict[str, Any],
+) -> None:
+    if not settings.raw_upstream_stream_path:
+        return
+    path = Path(settings.raw_upstream_stream_path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    record = {
+        "ts": datetime.now(UTC).isoformat(),
+        "event": "upstream_stream_chunk_raw",
+        "request_id": request_id,
+        "model_alias": model.alias,
+        "upstream_model": model.upstream_model,
+        "chunk_index": chunk_index,
+        "chunk": chunk,
+    }
+    with path.open("a", encoding="utf-8") as file:
+        file.write(json.dumps(record, ensure_ascii=False, sort_keys=True) + "\n")
 
 
 def _sanitize_capture(value: Any) -> Any:
