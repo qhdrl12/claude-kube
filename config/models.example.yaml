@@ -1,0 +1,24 @@
+models:
+  - alias: glm-5.2
+    upstream_base_url: ${KUBEFLOW_ENDPOINT}
+    upstream_model: ${KUBEFLOW_MODEL}
+    api_key_env: KUBEFLOW_API_KEY
+    routing_tier: default
+    capabilities:
+      streaming: true
+      tools: true
+      reasoning: true
+      reasoning_exclude: true
+      expose_reasoning: false
+      max_context_tokens: 131072
+
+  # Optional: add more Kubeflow/vLLM routes as separate aliases.
+  # - alias: qwen-coder
+  #   upstream_base_url: ${KUBEFLOW_QWEN_ENDPOINT}
+  #   upstream_model: ${KUBEFLOW_QWEN_MODEL}
+  #   api_key_env: KUBEFLOW_API_KEY
+  #   routing_tier: fast
+  #   capabilities:
+  #     streaming: true
+  #     tools: true
+  #     reasoning: false
