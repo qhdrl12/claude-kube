@@ -51,6 +51,21 @@ KUBEFLOW_MODEL=glm-5.2
 KUBEFLOW_API_KEY=<shared-internal-key>
 ```
 
+`KUBEFLOW_ENDPOINT` may be either the OpenAI-compatible base URL or the final chat
+completions URL:
+
+```bash
+# Base URL. The gateway calls <base>/chat/completions.
+KUBEFLOW_ENDPOINT=https://<kubeflow-route>/v1
+
+# Final URL. The gateway uses this as-is.
+KUBEFLOW_ENDPOINT=https://<kubeflow-route>/v1/chat/completions
+```
+
+When each Kubeflow endpoint already points to one served model, `KUBEFLOW_MODEL` can stay
+the same as the Claude Code alias, for example `glm-5.2`; the endpoint routing is what
+selects the actual model.
+
 For local-only use, remove this line if it exists in your `.env`:
 
 ```bash

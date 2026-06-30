@@ -353,6 +353,7 @@ async def test_messages_route_logs_upstream_400_body_summary_without_secrets(
     logs = "\n".join(record.getMessage() for record in caplog.records)
     assert "claude_proxy.upstream_error" in logs
     assert '"status_code": 400' in logs
+    assert '"upstream_path": "/v1/chat/completions"' in logs
     assert '"upstream_error_message": "reasoning.exclude is not supported"' in logs
     assert '"upstream_error_type": "bad_request"' in logs
     assert "secret prompt text" not in logs

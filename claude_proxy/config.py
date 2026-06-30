@@ -31,7 +31,10 @@ class ModelConfig(BaseModel):
 
     @property
     def upstream_chat_completions_url(self) -> str:
-        return f"{self.upstream_base_url.rstrip('/')}/chat/completions"
+        base_url = self.upstream_base_url.rstrip("/")
+        if base_url.endswith("/chat/completions"):
+            return base_url
+        return f"{base_url}/chat/completions"
 
 
 class ModelResolution(BaseModel):

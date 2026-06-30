@@ -22,6 +22,17 @@ def test_model_registry_resolves_alias_and_api_key_from_environment(monkeypatch)
     assert model.upstream_chat_completions_url == "https://kubeflow.example/v1/chat/completions"
 
 
+def test_model_config_accepts_final_chat_completions_endpoint() -> None:
+    model = ModelConfig(
+        alias="glm-5.2",
+        upstream_base_url="https://kubeflow.example/v1/chat/completions",
+        upstream_model="glm-5.2-serving",
+        api_key_env="KUBEFLOW_API_KEY",
+    )
+
+    assert model.upstream_chat_completions_url == "https://kubeflow.example/v1/chat/completions"
+
+
 def test_model_registry_resolves_api_key_from_dotenv_file(tmp_path, monkeypatch) -> None:
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
     env_file = tmp_path / ".env"

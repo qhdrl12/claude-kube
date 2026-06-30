@@ -9,6 +9,7 @@ from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit
 
 import httpx
 from fastapi import FastAPI, Header, HTTPException, Request
@@ -378,6 +379,7 @@ def _log_upstream_error(
             "request_id": request_id,
             "model_alias": model.alias,
             "upstream_model": model.upstream_model,
+            "upstream_path": _url_path(model.upstream_chat_completions_url),
             "status_code": status_code,
             "upstream_error_type": error_type,
             "upstream_error_message": error_message,
@@ -402,6 +404,14 @@ def _log_bad_request(
             "detail": _truncate_text(detail),
         },
     )
+
+
+def _url_path(url: str) -> str:
+    parsed = urlsplit(url)
+    path = parsed.path or "/"
+    if parsed.query:
+        return f"{path}?{parsed.query}"
+    return path
 
 
 def _log_model_fallback(request_id: str, resolution) -> None:
