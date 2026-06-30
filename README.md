@@ -292,12 +292,15 @@ claude_proxy.reasoning_config {"claude_effort": "high", "claude_thinking_type": 
 Usage log:
 
 ```text
-claude_proxy.usage {"elapsed_ms": 1240.5, "input_tokens": 1800, "output_tokens": 420, "reasoning_tokens": 96, "stream": true, "total_tokens": 2220}
+claude_proxy.usage {"elapsed_ms": 1240.5, "input_tokens": 1800, "output_tokens": 420, "reasoning_tokens": 96, "reasoning_tokens_source": "upstream_usage", "reasoning_output_chars": 540, "stream": true, "total_tokens": 2220}
 ```
 
 Use these two lines to compare `--effort low`, `--effort high`, and `--effort xhigh`.
 Some upstreams do not report `reasoning_tokens`; in that case the field is logged as
-`null`, but `upstream_reasoning_effort` still confirms what the gateway sent.
+`null` and `reasoning_tokens_source` is `unavailable_upstream`. If the upstream streams
+reasoning text without a separate reasoning token count, `reasoning_output_chars` shows
+the hidden reasoning text length without logging the reasoning content itself. Exact
+reasoning token counts are only logged when the upstream usage object provides them.
 
 400 diagnostics:
 

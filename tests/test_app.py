@@ -348,6 +348,72 @@ async def test_messages_route_requests_stream_usage_from_openai_compatible_upstr
 
 
 @pytest.mark.asyncio
+async def test_messages_route_logs_reasoning_chars_when_upstream_usage_lacks_reasoning_tokens(
+    monkeypatch,
+    caplog,
+) -> None:
+    monkeypatch.setenv("KUBEFLOW_API_KEY", "upstream-secret")
+    transport = FakeUpstreamTransport(
+        httpx.Response(
+            200,
+            text=(
+                'data: {"id":"chatcmpl_1","choices":[{"delta":{"role":"assistant"}}]}\n\n'
+                'data: {"choices":[{"delta":{"reasoning":"think "}}]}\n\n'
+                'data: {"choices":[{"delta":{"reasoning":"more"}}]}\n\n'
+                'data: {"choices":[{"delta":{"content":"ok"}}],"usage":'
+                '{"prompt_tokens":5,"completion_tokens":7,"total_tokens":12}}\n\n'
+                'data: {"choices":[{"delta":{},"finish_reason":"stop"}]}\n\n'
+                "data: [DONE]\n\n"
+            ),
+            headers={"content-type": "text/event-stream"},
+        )
+    )
+    app = create_app(
+        settings=Settings(gateway_auth_token=None),
+        registry=ModelRegistry(
+            models=[
+                ModelConfig(
+                    alias="glm-5.2",
+                    upstream_base_url="https://kubeflow.example/v1",
+                    upstream_model="glm-5.2-serving",
+                    api_key_env="KUBEFLOW_API_KEY",
+                    capabilities={"reasoning": True, "reasoning_exclude": True},
+                )
+            ]
+        ),
+        upstream_client=httpx.AsyncClient(transport=transport),
+    )
+
+    with caplog.at_level(logging.INFO, logger="claude_proxy"):
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app),
+            base_url="http://test",
+        ) as client:
+            response = await client.post(
+                "/v1/messages",
+                json={
+                    "model": "glm-5.2",
+                    "max_tokens": 128,
+                    "stream": True,
+                    "thinking": {"type": "adaptive"},
+                    "output_config": {"effort": "high"},
+                    "messages": [{"role": "user", "content": "hello"}],
+                },
+            )
+
+    assert response.status_code == 200
+    logs = "\n".join(record.getMessage() for record in caplog.records)
+    assert '"input_tokens": 5' in logs
+    assert '"output_tokens": 7' in logs
+    assert '"total_tokens": 12' in logs
+    assert '"reasoning_tokens": null' in logs
+    assert '"reasoning_tokens_source": "unavailable_upstream"' in logs
+    assert '"reasoning_output_chars": 10' in logs
+    assert '"usage_keys": ["completion_tokens", "prompt_tokens", "total_tokens"]' in logs
+    assert "think more" not in logs
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("status_code", [400, 401, 429, 500])
 async def test_messages_route_preserves_upstream_error_status_and_body(
     monkeypatch,

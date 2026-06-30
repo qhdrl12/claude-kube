@@ -246,6 +246,7 @@ async def _stream_upstream_events(
         },
         started_at,
         stream=True,
+        observed_reasoning_chars=builder.reasoning_output_chars,
     )
 
 
@@ -357,8 +358,11 @@ def _log_usage(
     started_at: float,
     *,
     stream: bool,
+    observed_reasoning_chars: int | None = None,
 ) -> None:
     summary = _usage_summary(usage)
+    if observed_reasoning_chars is not None:
+        summary["reasoning_output_chars"] = observed_reasoning_chars
     summary.update(
         {
             "request_id": request_id,
@@ -463,15 +467,22 @@ def _usage_summary(usage: Any) -> dict[str, Any]:
         usage.get("completion_tokens_details"),
         usage.get("output_tokens_details"),
         usage.get("completion_details"),
+        usage.get("completion_token_details"),
+        usage.get("output_token_details"),
     )
     prompt_details = _first_dict(
         usage.get("prompt_tokens_details"),
         usage.get("input_tokens_details"),
         usage.get("prompt_details"),
+        usage.get("prompt_token_details"),
+        usage.get("input_token_details"),
     )
     reasoning_tokens = _first_int(
         usage.get("reasoning_tokens"),
         completion_details.get("reasoning_tokens"),
+        completion_details.get("reasoning"),
+        completion_details.get("reasoning_token_count"),
+        usage.get("reasoning_token_count"),
         usage.get("reasoning"),
     )
     return {
@@ -479,6 +490,11 @@ def _usage_summary(usage: Any) -> dict[str, Any]:
         "output_tokens": _first_int(usage.get("completion_tokens"), usage.get("output_tokens")),
         "total_tokens": _first_int(usage.get("total_tokens")),
         "reasoning_tokens": reasoning_tokens,
+        "reasoning_tokens_source": (
+            "upstream_usage" if reasoning_tokens is not None else "unavailable_upstream"
+        ),
+        "usage_keys": sorted(usage.keys()),
+        "completion_token_detail_keys": sorted(completion_details.keys()),
         "cached_input_tokens": _first_int(
             prompt_details.get("cached_tokens"),
             prompt_details.get("cached_input_tokens"),

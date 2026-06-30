@@ -112,6 +112,7 @@ class AnthropicStreamBuilder:
         self.stop_reason = "end_turn"
         self.tool_calls: dict[int, dict[str, Any]] = {}
         self.usage = {"input_tokens": 0, "output_tokens": 0}
+        self.reasoning_output_chars = 0
         self.reasoning_prefix_sent = False
 
     def consume(self, chunk: dict[str, Any]) -> list[dict[str, Any]]:
@@ -149,11 +150,14 @@ class AnthropicStreamBuilder:
             if text := delta.get("content"):
                 events.extend(self._append_text_delta(text, kind="content"))
 
-            if self.expose_reasoning and (reasoning := _delta_reasoning_to_text(delta)):
-                if not self.reasoning_prefix_sent:
-                    reasoning = f"Reasoning:\n{reasoning}"
-                    self.reasoning_prefix_sent = True
-                events.extend(self._append_text_delta(reasoning, kind="reasoning"))
+            reasoning = _delta_reasoning_to_text(delta)
+            if reasoning:
+                self.reasoning_output_chars += len(reasoning)
+                if self.expose_reasoning:
+                    if not self.reasoning_prefix_sent:
+                        reasoning = f"Reasoning:\n{reasoning}"
+                        self.reasoning_prefix_sent = True
+                    events.extend(self._append_text_delta(reasoning, kind="reasoning"))
 
             for tool_call in delta.get("tool_calls") or []:
                 index = int(tool_call.get("index", 0))
