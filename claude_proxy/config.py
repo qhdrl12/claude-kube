@@ -97,6 +97,7 @@ class Settings(BaseSettings):
     service_name: str = "claude-proxy"
     capture_path: str | None = None
     capture_headers: bool = False
+    log_upstream_stream_chunks: bool = False
     unknown_model_fallback_alias: str | None = None
 
 

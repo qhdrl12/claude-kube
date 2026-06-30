@@ -301,6 +301,72 @@ async def test_messages_route_logs_stream_usage_when_upstream_provides_usage(
 
 
 @pytest.mark.asyncio
+async def test_messages_route_can_log_sanitized_upstream_stream_chunk_shapes(
+    monkeypatch,
+    caplog,
+) -> None:
+    monkeypatch.setenv("KUBEFLOW_API_KEY", "upstream-secret")
+    transport = FakeUpstreamTransport(
+        httpx.Response(
+            200,
+            text=(
+                'data: {"id":"chatcmpl_1","choices":[{"index":0,"delta":'
+                '{"reasoning":"hidden","content":"visible","tool_calls":[{"index":0}]}}],'
+                '"usage":{"prompt_tokens":5,"completion_tokens":7,"total_tokens":12}}\n\n'
+                'data: {"choices":[{"delta":{},"finish_reason":"stop"}]}\n\n'
+                "data: [DONE]\n\n"
+            ),
+            headers={"content-type": "text/event-stream"},
+        )
+    )
+    app = create_app(
+        settings=Settings(
+            gateway_auth_token=None,
+            log_upstream_stream_chunks=True,
+        ),
+        registry=ModelRegistry(
+            models=[
+                ModelConfig(
+                    alias="glm-5.2",
+                    upstream_base_url="https://kubeflow.example/v1",
+                    upstream_model="glm-5.2-serving",
+                    api_key_env="KUBEFLOW_API_KEY",
+                )
+            ]
+        ),
+        upstream_client=httpx.AsyncClient(transport=transport),
+    )
+
+    with caplog.at_level(logging.INFO, logger="claude_proxy"):
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app),
+            base_url="http://test",
+        ) as client:
+            response = await client.post(
+                "/v1/messages",
+                json={
+                    "model": "glm-5.2",
+                    "max_tokens": 128,
+                    "stream": True,
+                    "messages": [{"role": "user", "content": "hello"}],
+                },
+            )
+
+    assert response.status_code == 200
+    logs = "\n".join(record.getMessage() for record in caplog.records)
+    assert "claude_proxy.upstream_stream_chunk" in logs
+    assert '"chunk_index": 0' in logs
+    assert '"delta_keys": ["content", "reasoning", "tool_calls"]' in logs
+    assert '"reasoning_chars": 6' in logs
+    assert '"content_chars": 7' in logs
+    assert '"tool_call_count": 1' in logs
+    assert '"usage": {"completion_tokens": 7, "prompt_tokens": 5, "total_tokens": 12}' in logs
+    assert "hidden" not in logs
+    assert "visible" not in logs
+    assert "hello" not in logs
+
+
+@pytest.mark.asyncio
 async def test_messages_route_requests_stream_usage_from_openai_compatible_upstream(
     monkeypatch,
 ) -> None:

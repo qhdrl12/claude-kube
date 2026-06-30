@@ -219,6 +219,7 @@ async def _stream_upstream_events(
             )
             return
         stream_usage: dict[str, Any] | None = None
+        chunk_index = 0
         async for line in response.aiter_lines():
             if not line.startswith("data:"):
                 continue
@@ -226,6 +227,9 @@ async def _stream_upstream_events(
             if not data or data == "[DONE]":
                 continue
             chunk = json.loads(data)
+            if settings.log_upstream_stream_chunks:
+                _log_upstream_stream_chunk(request_id, model, chunk_index, chunk)
+            chunk_index += 1
             if isinstance(chunk.get("usage"), dict):
                 stream_usage = chunk["usage"]
             _capture(settings, "upstream_stream_chunk", chunk)
@@ -413,6 +417,47 @@ def _log_upstream_error(
     )
 
 
+def _log_upstream_stream_chunk(
+    request_id: str,
+    model,
+    chunk_index: int,
+    chunk: dict[str, Any],
+) -> None:
+    usage = chunk.get("usage") if isinstance(chunk.get("usage"), dict) else None
+    _log_json(
+        "claude_proxy.upstream_stream_chunk",
+        {
+            "request_id": request_id,
+            "model_alias": model.alias,
+            "upstream_model": model.upstream_model,
+            "chunk_index": chunk_index,
+            "chunk_keys": sorted(chunk.keys()),
+            "choice_count": len(chunk.get("choices") or []),
+            "choices": [_stream_choice_summary(choice) for choice in chunk.get("choices") or []],
+            "usage": usage,
+            "usage_summary": _usage_summary(usage),
+        },
+    )
+
+
+def _stream_choice_summary(choice: Any) -> dict[str, Any]:
+    choice = choice if isinstance(choice, dict) else {}
+    delta = choice.get("delta") if isinstance(choice.get("delta"), dict) else {}
+    reasoning = _string_or_empty(delta.get("reasoning"))
+    reasoning_content = _string_or_empty(delta.get("reasoning_content"))
+    content = _string_or_empty(delta.get("content"))
+    return {
+        "index": choice.get("index"),
+        "finish_reason": choice.get("finish_reason"),
+        "choice_keys": sorted(choice.keys()),
+        "delta_keys": sorted(delta.keys()),
+        "reasoning_chars": len(reasoning),
+        "reasoning_content_chars": len(reasoning_content),
+        "content_chars": len(content),
+        "tool_call_count": len(delta.get("tool_calls") or []),
+    }
+
+
 def _log_bad_request(
     request_id: str,
     *,
@@ -467,6 +512,10 @@ def _error_summary(body: Any) -> tuple[str | None, str | None]:
 
 def _string_or_none(value: Any) -> str | None:
     return value if isinstance(value, str) else None
+
+
+def _string_or_empty(value: Any) -> str:
+    return value if isinstance(value, str) else ""
 
 
 def _truncate_text(value: Any, limit: int = 500) -> str | None:

@@ -352,6 +352,28 @@ without changing the exact `reasoning_tokens` field. `reasoning_output_chars` is
 Python string length of the hidden reasoning chunks emitted by vLLM as `delta.reasoning`
 or legacy `delta.reasoning_content`; it is not token usage.
 
+For debugging upstream stream shapes, enable sanitized per-chunk logs:
+
+```bash
+export CLAUDE_PROXY_LOG_UPSTREAM_STREAM_CHUNKS=true
+uv run uvicorn claude_proxy.main:app
+```
+
+This writes `claude_proxy.upstream_stream_chunk` lines with chunk keys, delta keys,
+reasoning/content character counts, tool call counts, and the upstream `usage` object.
+It does not log prompt text, visible content, reasoning text, tool arguments, API keys, or
+authorization headers.
+
+If you need full raw chunks for local-only debugging, use the existing capture file
+instead:
+
+```bash
+export CLAUDE_PROXY_CAPTURE_PATH=tmp/claude-proxy-capture.jsonl
+```
+
+The capture file may contain model output text and tool payloads, so do not share it
+without reviewing/redacting it first.
+
 400 diagnostics:
 
 ```text
