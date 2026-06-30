@@ -8,6 +8,10 @@ models:
       streaming: true
       tools: true
       reasoning: true
-      reasoning_exclude: true
+      reasoning_format: vllm
       expose_reasoning: false
       max_context_tokens: 131072
+    # Optional model-specific vLLM request fields.
+    # extra_body:
+    #   chat_template_kwargs:
+    #     enable_thinking: true

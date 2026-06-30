@@ -333,6 +333,14 @@ def _log_reasoning_config(
     output_config = output_config_raw if isinstance(output_config_raw, dict) else {}
     thinking = thinking_raw if isinstance(thinking_raw, dict) else {}
     reasoning = reasoning_raw if isinstance(reasoning_raw, dict) else {}
+    vllm_reasoning_effort = upstream_payload.get("reasoning_effort")
+    vllm_thinking_token_budget = upstream_payload.get("thinking_token_budget")
+    upstream_reasoning_enabled = bool(
+        reasoning.get("enabled", False)
+        or vllm_reasoning_effort
+        or vllm_thinking_token_budget
+        or upstream_payload.get("include_reasoning") is True
+    )
     _log_json(
         "claude_proxy.reasoning_config",
         {
@@ -342,10 +350,14 @@ def _log_reasoning_config(
             "stream": bool(upstream_payload.get("stream")),
             "claude_thinking_type": thinking.get("type"),
             "claude_effort": output_config.get("effort"),
-            "upstream_reasoning_enabled": reasoning.get("enabled", False),
-            "upstream_reasoning_effort": reasoning.get("effort"),
-            "upstream_reasoning_max_tokens": reasoning.get("max_tokens"),
+            "upstream_reasoning_format": model.capabilities.get("reasoning_format", "openrouter"),
+            "upstream_reasoning_enabled": upstream_reasoning_enabled,
+            "upstream_reasoning_effort": reasoning.get("effort") or vllm_reasoning_effort,
+            "upstream_reasoning_max_tokens": (
+                reasoning.get("max_tokens") or vllm_thinking_token_budget
+            ),
             "upstream_reasoning_exclude": reasoning.get("exclude", False),
+            "upstream_include_reasoning": upstream_payload.get("include_reasoning"),
             "expose_reasoning": bool(model.capabilities.get("expose_reasoning")),
         },
     )

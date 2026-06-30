@@ -50,10 +50,14 @@ def anthropic_messages_to_openai_chat(
     if model.capabilities.get("reasoning"):
         reasoning = _anthropic_reasoning_config(payload)
         if reasoning:
-            if model.capabilities.get("reasoning_exclude"):
-                reasoning["exclude"] = True
-            extra_body["reasoning"] = reasoning
+            if model.capabilities.get("reasoning_format") == "vllm":
+                extra_body.update(_openai_reasoning_to_vllm(reasoning))
+            else:
+                if model.capabilities.get("reasoning_exclude"):
+                    reasoning["exclude"] = True
+                extra_body["reasoning"] = reasoning
     result.update(extra_body)
+    result.update(model.extra_body)
     return result
 
 
@@ -376,7 +380,7 @@ def _anthropic_reasoning_config(payload: dict[str, Any]) -> dict[str, Any]:
     else:
         return {}
 
-    if output_effort and "max_tokens" not in reasoning:
+    if output_effort:
         reasoning["effort"] = output_effort
     return reasoning
 
@@ -395,6 +399,15 @@ def _anthropic_thinking_to_openai_reasoning(thinking: Any) -> dict[str, Any]:
     if budget_tokens := thinking.get("budget_tokens"):
         reasoning["max_tokens"] = budget_tokens
     return reasoning
+
+
+def _openai_reasoning_to_vllm(reasoning: dict[str, Any]) -> dict[str, Any]:
+    result: dict[str, Any] = {"include_reasoning": True}
+    if effort := reasoning.get("effort"):
+        result["reasoning_effort"] = effort
+    if max_tokens := reasoning.get("max_tokens"):
+        result["thinking_token_budget"] = max_tokens
+    return result
 
 
 def _output_config_effort(output_config: Any) -> str | None:

@@ -190,6 +190,53 @@ def test_anthropic_output_config_effort_maps_to_openai_reasoning_effort() -> Non
     }
 
 
+def test_anthropic_output_config_effort_maps_to_vllm_reasoning_fields() -> None:
+    model = ModelConfig(
+        alias="glm-5.2",
+        upstream_base_url="https://kubeflow.example/v1",
+        upstream_model="glm-5.2-serving",
+        api_key_env="KUBEFLOW_API_KEY",
+        capabilities={"reasoning": True, "reasoning_format": "vllm"},
+    )
+
+    result = anthropic_messages_to_openai_chat(
+        {
+            "model": "glm-5.2",
+            "max_tokens": 128,
+            "thinking": {"type": "enabled", "budget_tokens": 512},
+            "output_config": {"effort": "xhigh"},
+            "messages": [{"role": "user", "content": "think hard"}],
+        },
+        model,
+    )
+
+    assert "reasoning" not in result
+    assert result["reasoning_effort"] == "xhigh"
+    assert result["thinking_token_budget"] == 512
+    assert result["include_reasoning"] is True
+
+
+def test_model_extra_body_is_forwarded_to_openai_chat_payload() -> None:
+    model = ModelConfig(
+        alias="glm-5.2",
+        upstream_base_url="https://kubeflow.example/v1",
+        upstream_model="glm-5.2-serving",
+        api_key_env="KUBEFLOW_API_KEY",
+        extra_body={"chat_template_kwargs": {"enable_thinking": True}},
+    )
+
+    result = anthropic_messages_to_openai_chat(
+        {
+            "model": "glm-5.2",
+            "max_tokens": 128,
+            "messages": [{"role": "user", "content": "think hard"}],
+        },
+        model,
+    )
+
+    assert result["chat_template_kwargs"] == {"enable_thinking": True}
+
+
 def test_openai_response_maps_text_and_tool_calls_to_anthropic_message() -> None:
     response = {
         "id": "chatcmpl_123",

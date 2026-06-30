@@ -819,6 +819,77 @@ async def test_messages_route_forwards_effort_but_hides_reasoning_by_default(
 
 
 @pytest.mark.asyncio
+async def test_messages_route_forwards_effort_as_vllm_reasoning_fields(
+    monkeypatch,
+    caplog,
+) -> None:
+    monkeypatch.setenv("KUBEFLOW_API_KEY", "upstream-secret")
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        upstream_payload = json.loads(request.content)
+        assert "reasoning" not in upstream_payload
+        assert upstream_payload["reasoning_effort"] == "xhigh"
+        assert upstream_payload["include_reasoning"] is True
+        return httpx.Response(
+            200,
+            json={
+                "id": "chatcmpl_reasoning",
+                "choices": [
+                    {
+                        "message": {
+                            "role": "assistant",
+                            "content": "ok",
+                            "reasoning": "Hidden reasoning.",
+                        },
+                        "finish_reason": "stop",
+                    }
+                ],
+                "usage": {"prompt_tokens": 1, "completion_tokens": 2, "total_tokens": 3},
+            },
+        )
+
+    app = create_app(
+        settings=Settings(gateway_auth_token=None),
+        registry=ModelRegistry(
+            models=[
+                ModelConfig(
+                    alias="glm-5.2",
+                    upstream_base_url="https://kubeflow.example/v1",
+                    upstream_model="glm-5.2-serving",
+                    api_key_env="KUBEFLOW_API_KEY",
+                    capabilities={"reasoning": True, "reasoning_format": "vllm"},
+                )
+            ]
+        ),
+        upstream_client=httpx.AsyncClient(transport=httpx.MockTransport(handler)),
+    )
+
+    with caplog.at_level(logging.INFO, logger="claude_proxy"):
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app),
+            base_url="http://test",
+        ) as client:
+            response = await client.post(
+                "/v1/messages",
+                json={
+                    "model": "glm-5.2",
+                    "max_tokens": 128,
+                    "thinking": {"type": "adaptive"},
+                    "output_config": {"effort": "xhigh"},
+                    "messages": [{"role": "user", "content": "hello"}],
+                },
+            )
+
+    assert response.status_code == 200
+    assert response.json()["content"] == [{"type": "text", "text": "ok"}]
+    logs = "\n".join(record.getMessage() for record in caplog.records)
+    assert '"upstream_reasoning_format": "vllm"' in logs
+    assert '"upstream_reasoning_enabled": true' in logs
+    assert '"upstream_reasoning_effort": "xhigh"' in logs
+    assert '"upstream_include_reasoning": true' in logs
+
+
+@pytest.mark.asyncio
 async def test_messages_route_logs_reasoning_config_and_usage_without_payload_text(
     monkeypatch,
     caplog,

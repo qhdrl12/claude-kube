@@ -211,12 +211,33 @@ models:
       streaming: true
       tools: true
       reasoning: true
-      reasoning_exclude: true
+      reasoning_format: vllm
       expose_reasoning: false
 ```
 
 Additional models are added as more `models[]` entries. Claude Code keeps using the
 `alias`; the upstream model name and endpoint stay behind the registry.
+
+For Kubeflow/vLLM, keep `reasoning_format: vllm`. The gateway maps Claude Code effort to
+vLLM's top-level `reasoning_effort`, sends `include_reasoning: true` so reasoning can be
+observed by the gateway, and still hides reasoning from Claude Code when
+`expose_reasoning: false`.
+
+The vLLM server must also be started with the reasoning support required by the served
+model, such as the appropriate `--reasoning-parser` or model-specific chat template
+thinking configuration. If vLLM is not reasoning-enabled, it may accept the request but
+answer immediately without `delta.reasoning`.
+
+If a served model requires extra vLLM request fields, add them per model:
+
+```yaml
+extra_body:
+  chat_template_kwargs:
+    enable_thinking: true
+```
+
+Use this only when the specific model/server expects those fields. The gateway also sends
+`reasoning_effort` for Claude Code `/effort` values when `reasoning_format: vllm`.
 
 ## Verification
 
@@ -286,7 +307,7 @@ not include prompt text, tool arguments, API keys, or authorization headers.
 Reasoning application log:
 
 ```text
-claude_proxy.reasoning_config {"claude_effort": "high", "claude_thinking_type": "adaptive", "expose_reasoning": false, "model_alias": "glm-5.2", "stream": true, "upstream_model": "...", "upstream_reasoning_effort": "high", "upstream_reasoning_enabled": true, "upstream_reasoning_exclude": true}
+claude_proxy.reasoning_config {"claude_effort": "high", "claude_thinking_type": "adaptive", "expose_reasoning": false, "model_alias": "glm-5.2", "stream": true, "upstream_include_reasoning": true, "upstream_model": "...", "upstream_reasoning_effort": "high", "upstream_reasoning_enabled": true, "upstream_reasoning_exclude": false, "upstream_reasoning_format": "vllm"}
 ```
 
 Usage log:

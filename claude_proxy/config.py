@@ -21,6 +21,7 @@ class ModelConfig(BaseModel):
     capabilities: dict[str, Any] = Field(default_factory=dict)
     routing_tier: str = "default"
     extra_headers: dict[str, str] = Field(default_factory=dict)
+    extra_body: dict[str, Any] = Field(default_factory=dict)
 
     @property
     def upstream_api_key(self) -> str:
