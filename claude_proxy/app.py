@@ -375,6 +375,9 @@ def _log_usage(
     summary = _usage_summary(usage)
     if observed_reasoning_chars is not None:
         summary["reasoning_output_chars"] = observed_reasoning_chars
+        if summary["reasoning_tokens"] is None and observed_reasoning_chars > 0:
+            estimated_tokens = _estimate_tokens_from_chars(observed_reasoning_chars)
+            summary["reasoning_tokens_estimated"] = estimated_tokens
     summary.update(
         {
             "request_id": request_id,
@@ -505,6 +508,8 @@ def _usage_summary(usage: Any) -> dict[str, Any]:
         "reasoning_tokens_source": (
             "upstream_usage" if reasoning_tokens is not None else "unavailable_upstream"
         ),
+        "reasoning_tokens_estimated": None,
+        "reasoning_tokens_exact": reasoning_tokens is not None,
         "usage_keys": sorted(usage.keys()),
         "completion_token_detail_keys": sorted(completion_details.keys()),
         "cached_input_tokens": _first_int(
@@ -519,6 +524,10 @@ def _first_dict(*values: Any) -> dict[str, Any]:
         if isinstance(value, dict):
             return value
     return {}
+
+
+def _estimate_tokens_from_chars(char_count: int) -> int:
+    return max(1, (char_count + 3) // 4)
 
 
 def _first_int(*values: Any) -> int | None:
