@@ -301,6 +301,53 @@ async def test_messages_route_logs_stream_usage_when_upstream_provides_usage(
 
 
 @pytest.mark.asyncio
+async def test_messages_route_requests_stream_usage_from_openai_compatible_upstream(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("KUBEFLOW_API_KEY", "upstream-secret")
+    transport = FakeUpstreamTransport(
+        httpx.Response(
+            200,
+            text='data: {"choices":[{"delta":{},"finish_reason":"stop"}]}\n\n'
+            "data: [DONE]\n\n",
+            headers={"content-type": "text/event-stream"},
+        )
+    )
+    app = create_app(
+        settings=Settings(gateway_auth_token=None),
+        registry=ModelRegistry(
+            models=[
+                ModelConfig(
+                    alias="glm-5.2",
+                    upstream_base_url="https://kubeflow.example/v1",
+                    upstream_model="glm-5.2-serving",
+                    api_key_env="KUBEFLOW_API_KEY",
+                )
+            ]
+        ),
+        upstream_client=httpx.AsyncClient(transport=transport),
+    )
+
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app),
+        base_url="http://test",
+    ) as client:
+        response = await client.post(
+            "/v1/messages",
+            json={
+                "model": "glm-5.2",
+                "max_tokens": 128,
+                "stream": True,
+                "messages": [{"role": "user", "content": "hello"}],
+            },
+        )
+
+    assert response.status_code == 200
+    upstream_payload = json.loads(transport.requests[0].content)
+    assert upstream_payload["stream_options"] == {"include_usage": True}
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("status_code", [400, 401, 429, 500])
 async def test_messages_route_preserves_upstream_error_status_and_body(
     monkeypatch,

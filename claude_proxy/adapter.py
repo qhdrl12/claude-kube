@@ -33,6 +33,8 @@ def anthropic_messages_to_openai_chat(
         "messages": messages,
         "stream": bool(payload.get("stream", False)),
     }
+    if result["stream"]:
+        result["stream_options"] = {"include_usage": True}
     for key in ("max_tokens", "temperature", "top_p", "stop"):
         if key in payload:
             result[key] = payload[key]

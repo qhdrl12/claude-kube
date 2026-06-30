@@ -66,6 +66,7 @@ def test_anthropic_messages_request_maps_tools_and_tool_results_to_openai_chat()
 
     assert result["model"] == "glm-5.2-serving"
     assert result["stream"] is True
+    assert result["stream_options"] == {"include_usage": True}
     assert result["max_tokens"] == 1024
     assert result["temperature"] == 0.2
     assert result["stop"] == ["</done>"]
