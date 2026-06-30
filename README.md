@@ -72,13 +72,20 @@ fails at startup with the missing variable name.
 ```bash
 export CLAUDE_PROXY_REGISTRY_PATH=config/models.yaml
 
-uv run uvicorn claude_proxy.main:app --host 127.0.0.1 --port 8000
+uv run uvicorn claude_proxy.main:app
 ```
 
 The direct `.venv` command is equivalent:
 
 ```bash
-.venv/bin/uvicorn claude_proxy.main:app --host 127.0.0.1 --port 8000
+.venv/bin/uvicorn claude_proxy.main:app
+```
+
+Uvicorn defaults to `127.0.0.1:8000`. Pass `--host` or `--port` only when you need
+different binding:
+
+```bash
+uv run uvicorn claude_proxy.main:app --host 127.0.0.1 --port 8001
 ```
 
 In another shell:
