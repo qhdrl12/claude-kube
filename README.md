@@ -198,6 +198,97 @@ claude-switch() {
 }
 ```
 
+## One-command Claude Code Launcher
+
+If you switch between Bedrock, Copilot, and this local gateway often, prefer a wrapper
+script instead of exporting `ANTHROPIC_BASE_URL` in your interactive shell. The wrapper
+starts the gateway when needed, waits for `/readyz`, injects Claude Code environment
+variables only into the child `claude` process, and leaves your current shell unchanged.
+
+Create `~/bin/claude-kube`:
+
+```bash
+mkdir -p ~/bin
+$EDITOR ~/bin/claude-kube
+chmod +x ~/bin/claude-kube
+```
+
+Paste this script:
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="${CLAUDE_KUBE_ROOT:-$HOME/Project/claude-proxy}"
+HOST="${CLAUDE_KUBE_HOST:-127.0.0.1}"
+PORT="${CLAUDE_KUBE_PORT:-8000}"
+BASE_URL="http://${HOST}:${PORT}"
+MODEL="${CLAUDE_KUBE_MODEL:-glm-5.2}"
+LOG_FILE="${CLAUDE_KUBE_LOG_FILE:-$ROOT/tmp/claude-kube.log}"
+
+mkdir -p "$ROOT/tmp"
+
+if ! curl -fsS "$BASE_URL/readyz" >/dev/null 2>&1; then
+  echo "Starting claude-kube gateway at $BASE_URL ..."
+  (
+    cd "$ROOT"
+    uv run uvicorn claude_proxy.main:app --host "$HOST" --port "$PORT"
+  ) >"$LOG_FILE" 2>&1 &
+
+  for _ in {1..60}; do
+    if curl -fsS "$BASE_URL/readyz" >/dev/null 2>&1; then
+      break
+    fi
+    sleep 0.2
+  done
+fi
+
+curl -fsS "$BASE_URL/readyz" >/dev/null
+
+export ANTHROPIC_BASE_URL="$BASE_URL"
+export CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY=1
+export ANTHROPIC_MODEL="$MODEL"
+export ANTHROPIC_DEFAULT_OPUS_MODEL="$MODEL"
+export ANTHROPIC_DEFAULT_SONNET_MODEL="$MODEL"
+export ANTHROPIC_DEFAULT_HAIKU_MODEL="$MODEL"
+export CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1
+unset ANTHROPIC_AUTH_TOKEN
+
+exec claude --model "$MODEL" "$@"
+```
+
+Use it like this:
+
+```bash
+claude-kube
+claude-kube -p "Reply with pong"
+CLAUDE_KUBE_MODEL=glm-5.2 claude-kube --effort high
+CLAUDE_KUBE_PORT=8001 claude-kube
+```
+
+Useful tips:
+
+- Add `~/bin` to `PATH` if your shell cannot find `claude-kube`:
+  `export PATH="$HOME/bin:$PATH"`.
+- The gateway log is written to `tmp/claude-kube.log` by default.
+- The script reuses an already-running gateway if `/readyz` succeeds.
+- The script does not stop the gateway when Claude Code exits. This keeps the next
+  Claude Code startup fast. Stop it manually with `pkill -f 'uvicorn claude_proxy.main:app'`
+  if you want a clean shutdown.
+- If you edited `.env`, restart the existing gateway before testing the new values.
+- If port `8000` is already occupied by another service, run
+  `CLAUDE_KUBE_PORT=8001 claude-kube`.
+- If `/model` does not show `glm-5.2`, confirm:
+  `curl -s http://127.0.0.1:8000/v1/models`.
+- For effort comparison, run the same prompt with `--effort low`, `--effort high`, and
+  `--effort xhigh`, then compare `claude_proxy.reasoning_config` and
+  `claude_proxy.usage` in the gateway log.
+- Keep shared Kubeflow secrets in `.env`; do not put API keys in the wrapper script.
+
+Use `claude-switch kube` when you want to change the current shell profile for multiple
+commands. Use `claude-kube` when you want one isolated Claude Code session without
+touching your Bedrock or Copilot shell state.
+
 ## Model Registry
 
 ```yaml
